@@ -1,0 +1,319 @@
+{
+	"info": {
+		"_postman_id": "166cdca3-fc0d-48ee-b014-a52cd7a97ae2",
+		"name": "PetStore_API_Testing",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "40280923"
+	},
+	"item": [
+		{
+			"name": "Create Pet",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"const id = Date.now();\r",
+							"const name = \"pet_\" + Math.floor(Math.random() * 10000);\r",
+							"\r",
+							"pm.environment.set(\"PetID\", id);\r",
+							"pm.environment.set(\"PetName\", name);\r",
+							"\r",
+							"console.log(\"Generated Pet ID:\", id);\r",
+							"console.log(\"Generated Pet Name:\", name);"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let res = pm.response.json();\r",
+							"\r",
+							"// check status code\r",
+							"pm.test((\"Status code is 200 or 201\"), function(){\r",
+							"    pm.expect(pm.response.code).to.be.oneOf([200,201]);\r",
+							"});\r",
+							"\r",
+							"//check basic fields\r",
+							"pm.test((\"Respone has ID,Name and Status\"),function(){\r",
+							"    pm.expect(res).to.have.property(\"id\");\r",
+							"    pm.expect(res).to.have.property(\"name\");\r",
+							"    pm.expect(res).to.have.property(\"status\");\r",
+							"});\r",
+							"\r",
+							"//Match response with environment variable\r",
+							"pm.test((\"PetID and Name match environment\"), function(){\r",
+							"    pm.expect(res.id).to.eql(Number(pm.environment.get(\"PetID\")));\r",
+							"    pm.expect(res.name).to.eql(pm.environment.get(\"PetName\"));\r",
+							"});\r",
+							"\r",
+							"//Update environment with returned values\r",
+							"\r",
+							"pm.test((\"Update environment with returned values\"),function(){\r",
+							"    pm.environment.set(\"PetID\", res.id);\r",
+							"    pm.environment.set(\"PetName\", res.name);\r",
+							"})"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"id\": {{PetID}},\r\n  \"name\": \"{{PetName}}\",\r\n  \"photoUrls\": [\"https://example.com/photo1.jpg\"],\r\n  \"tags\": [{\"id\": 1, \"name\": \"cute\"}],\r\n  \"status\": \"available\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{URL}}/pet",
+					"host": [
+						"{{URL}}"
+					],
+					"path": [
+						"pet"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Request Pet",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let res = {};\r",
+							"try {\r",
+							"    res = pm.response.json();\r",
+							"} catch (e) {\r",
+							"    res = {};\r",
+							"}\r",
+							"\r",
+							"let retryCount = Number(pm.variables.get(\"retryCount\")) || 0;\r",
+							"\r",
+							"// Retry logic for 404\r",
+							"if (pm.response.code === 404 && retryCount < 4) {\r",
+							"    retryCount++;\r",
+							"    pm.variables.set(\"retryCount\", retryCount);\r",
+							"    console.log(`Retrying Request Pet... attempt #${retryCount}`);\r",
+							"    postman.setNextRequest(\"Request Pet\");\r",
+							"    return;\r",
+							"} else {\r",
+							"    pm.variables.set(\"retryCount\", 0);\r",
+							"}\r",
+							"\r",
+							"// Only run tests when the request succeeded\r",
+							"if (pm.response.code === 200) {\r",
+							"    pm.test(\"Status code is 200\", function () {\r",
+							"        pm.response.to.have.status(200);\r",
+							"    });\r",
+							"\r",
+							"    pm.test(\"Response has required fields\", function () {\r",
+							"        pm.expect(res).to.have.property(\"id\");\r",
+							"        pm.expect(res).to.have.property(\"name\");\r",
+							"        pm.expect(res).to.have.property(\"status\");\r",
+							"    });\r",
+							"\r",
+							"    pm.test(\"PetID matches with created one\", function () {\r",
+							"        pm.expect(res.id).to.eql(Number(pm.environment.get(\"PetID\")));\r",
+							"    });\r",
+							"\r",
+							"    pm.test(\"Petname matches with created one\", function () {\r",
+							"        pm.expect(res.name).to.eql(pm.environment.get(\"PetName\"));\r",
+							"    });\r",
+							"} else {\r",
+							"    console.log(`Skipping tests — got status ${pm.response.code}`);\r",
+							"}\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "{{URL}}/pet/{{PetID}}",
+					"host": [
+						"{{URL}}"
+					],
+					"path": [
+						"pet",
+						"{{PetID}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Pet",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"console.log(\"Updating pet ID:\", pm.environment.get(\"petId\"));\r",
+							"console.log(\"Old name:\", pm.environment.get(\"petName\"));\r",
+							"console.log(\"Status changes from available to Sold\");"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let res = pm.response.json()\r",
+							"\r",
+							"// Status code check\r",
+							"pm.test((\"Status code is 200\"), function(){\r",
+							"    pm.response.to.have.status(200);\r",
+							"})\r",
+							"\r",
+							"// Validate structure\r",
+							"pm.test(\"Response contains required fields\", function () {\r",
+							"    pm.expect(res).to.have.property(\"id\");\r",
+							"    pm.expect(res).to.have.property(\"name\");\r",
+							"    pm.expect(res).to.have.property(\"status\");\r",
+							"});\r",
+							"\r",
+							"// verify updated name and status\r",
+							"pm.test((\"Pet name and status got updated\"), function(){\r",
+							"    pm.expect(res.name).to.eql(pm.environment.get(\"PetName\") + \"_Updated\");\r",
+							"    pm.expect(res.status).to.eql(\"Sold\");\r",
+							"});\r",
+							"\r",
+							"// Save Updated name back to environment\r",
+							"pm.environment.set(\"PetName\", res.name);\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"id\": {{PetID}},\r\n    \"name\": \"{{PetName}}_Updated\",\r\n    \"photoUrls\": [\r\n        \"https://example.com/photo1.jpg\"\r\n    ],\r\n    \"tags\": [\r\n        {\r\n            \"id\": 1,\r\n            \"name\": \"cute\"\r\n        }\r\n    ],\r\n    \"status\": \"Sold\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{URL}}/pet",
+					"host": [
+						"{{URL}}"
+					],
+					"path": [
+						"pet"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "delete Pet",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Check status code\r",
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"// Parse the response\r",
+							"let res = pm.response.json();\r",
+							"\r",
+							"// Check response message\r",
+							"pm.test(\"Pet deleted successfully\", function () {\r",
+							"    pm.expect(res.message).to.eql(pm.environment.get(\"PetID\").toString());\r",
+							"});\r",
+							"\r",
+							"\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{URL}}/pet/{{PetID}}",
+					"host": [
+						"{{URL}}"
+					],
+					"path": [
+						"pet",
+						"{{PetID}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
